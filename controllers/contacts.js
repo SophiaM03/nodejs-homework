@@ -1,181 +1,72 @@
 const contacts = require("../models/contacts");
-const Joi = require("joi");
+const { HttpError } = require("../helpers/httpError");
+const { ctrlWrapper } = require("../helpers/ctrlWrapper");
 
-const validation = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().required(),
-  phone: Joi.string().required(),
-  favorite: Joi.boolean(),
-});
+const addContact = async (req, res) => {
+  const { _id: owner } = req.user;
+  const result = await contacts.create({ ...req.body, owner });
+  res.status(201).json(result);
+};
 
-async function addContact(req, res, next) {
-  try {
-    const { name, email, phone, favorite } = req.body;
-    const { error } = validation.validate({ name, email, phone, favorite });
-    if (error) {
-      return res.status(400).json({
-        message: "missing required name field",
-      });
-    }
-    const result = await contacts.create({ name, email, phone, favorite });
-    const { _id, ...rest } = result.toObject();
-    const map = {
-      id: _id,
-      ...rest,
-    };
-    res.status(200).json(map);
-  } catch (error) {
-    next(error);
+const updateById = async (req, res) => {
+  const { id } = req.params;
+  const result = await contacts.findByIdAndUpdate(id, req.body, { new: true });
+  if (!result) {
+    throw HttpError(404, "Not found");
   }
-}
+  res.json(result);
+};
 
-async function updateById(req, res, next) {
-  try {
-    const { contactId } = req.params;
-    const { name, email, phone, favorite } = req.body;
-    const { error } = validation.validate({ name, email, phone, favorite });
-    if (error) {
-      return res.status(400).json({
-        message: "missing fields",
-      });
-    }
-    const result = await contacts
-      .findByIdAndUpdate(
-        contactId,
-        {
-          name,
-          email,
-          phone,
-          favorite,
-        },
-        { new: true }
-      )
-      .catch((error) => {
-        const err = Error(error.message);
-        err.code = 400;
-        throw err;
-      });
-    if (result === null) {
-      return res.status(404).json({
-        message: "Not found",
-      });
-    }
-    const { _id, ...rest } = result.toObject();
-    const map = {
-      id: _id,
-      ...rest,
-    };
-    res.status(200).json(map);
-  } catch (error) {
-    next(error);
+const removeContact = async (req, res) => {
+  const { id } = req.params;
+  const result = await contacts.findByIdAndRemove(id);
+  if (!result) {
+    throw HttpError(404, "Not found");
   }
-}
+  res.json({
+    message: "Contact deleted",
+  });
+};
 
-async function removeContact(req, res, next) {
-  try {
-    const { contactId } = req.params;
-    const result = await contacts
-      .findByIdAndDelete(contactId)
-      .catch((error) => {
-        const err = Error(error.message);
-        err.code = 400;
-        throw err;
-      });
-    if (result === null) {
-      return res.status(404).json({
-        message: "Not found",
-      });
-    }
-    res.status(200).json({
-      message: "Contact deleted",
-    });
-  } catch (error) {
-    next(error);
+const getContacts = async (req, res) => {
+  const { _id: owner } = req.user;
+  const { page = 1, limit = 20, favorite } = req.query;
+  const skip = (page - 1) * limit;
+  const query = { owner };
+  if (favorite) {
+    query.favorite = favorite;
   }
-}
 
-async function getContacts(req, res, next) {
-  try {
-    const result = await contacts.find();
-    const mapContacts = (contactDocument) => {
-      const { _id, ...rest } = contactDocument.toObject();
-      const mapContact = {
-        id: _id,
-        ...rest,
-      };
-      return mapContact;
-    };
-    const map = result.map(mapContacts);
+  const result = await contacts.find(query, "-createdAt -updatedAt", {
+    skip,
+    limit,
+  });
+  res.json(result);
+};
 
-    res.status(200).json(map);
-  } catch (error) {
-    next(error);
+const getContactById = async (req, res) => {
+  const { id } = req.params;
+  const result = await contacts.findById(id);
+  if (!result) {
+    throw HttpError(404, "Not found");
   }
-}
+  res.json(result);
+};
 
-async function getContactById(req, res, next) {
-  try {
-    const { contactId } = req.params;
-    const result = await contacts.findById(contactId).catch((error) => {
-      const err = Error(error.message);
-      err.code = 400;
-      throw err;
-    });
-    if (!result) {
-      return res.status(404).json({
-        message: "Not found",
-      });
-    }
-    const { _id, ...rest } = result.toObject();
-    const map = {
-      id: _id,
-      ...rest,
-    };
-    res.status(200).json(map);
-  } catch (error) {
-    next(error);
+const updateStatusContact = async (req, res) => {
+  const { id } = req.params;
+  const result = await contacts.findByIdAndUpdate(id, req.body, { new: true });
+  if (!result) {
+    throw HttpError(404, "Not found");
   }
-}
-
-async function updateStatusContact(req, res, next) {
-  try {
-    const { contactId } = req.params;
-    const { favorite } = req.body;
-
-    if (favorite === undefined) {
-      return res.status(400).json({
-        message: "missing field favorite",
-      });
-    }
-    const result = await contacts.findByIdAndUpdate(
-      contactId,
-      {
-        favorite,
-      },
-      { new: true }
-    );
-    if (result === null) {
-      return res.status(404).json({
-        message: "Not found",
-      });
-    }
-    const { _id, ...rest } = result.toObject();
-    const map = {
-      id: _id,
-      ...rest,
-    };
-
-    res.status(200).json(map);
-  } catch (error) {
-    next(error);
-  }
-}
+  res.json(result);
+};
 
 module.exports = {
-  addContact,
-  updateById,
-  removeContact,
-  getContacts,
-  getContactById,
-  updateStatusContact,
+  addContact: ctrlWrapper(addContact),
+  updateById: ctrlWrapper(updateById),
+  removeContact: ctrlWrapper(removeContact),
+  getContacts: ctrlWrapper(getContacts),
+  getContactById: ctrlWrapper(getContactById),
+  updateStatusContact: ctrlWrapper(updateStatusContact),
 };

@@ -1,5 +1,9 @@
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const Jimp = require("jimp");
+const gravatar = require("gravatar");
+const path = require("path");
+const fs = require("fs/promises");
 
 const { User } = require("../models/user");
 
@@ -7,16 +11,25 @@ const { HttpError } = require("../helpers/httpError");
 const { ctrlWrapper } = require("../helpers/ctrlWrapper");
 
 const { SECRET_KEY } = process.env;
+const avatarsDir = path.join(__dirname, "public", "avatars");
 
 const register = async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
+
   if (user) {
-    throw HttpError(409, "Email in use");
+    throw errorHandler(409, "Email already in use");
   }
 
   const hashPassword = await bcryptjs.hash(password, 10);
-  const newUser = await User.create({ ...req.body, password: hashPassword });
+  const avatarURL = gravatar.url(email);
+
+  const newUser = await User.create({
+    ...req.body,
+    password: hashPassword,
+    avatarURL,
+  });
+
   res.status(201).json({
     email: newUser.email,
     subscription: newUser.subscription,
@@ -73,6 +86,30 @@ const updateSubscriptionUser = async (req, res) => {
     email: updatedUser.email,
   });
 };
+const updateAvatar = async (req, res, next) => {
+  if (!req.file) {
+    throw HttpError(400, "No file uploaded");
+  }
+  const { path: temporaryName, originalname } = req.file;
+  const { _id } = req.user;
+  const filename = `${_id}_${originalname}`;
+  const targetFileName = path.join(storeAvatars, filename);
+  await fs.rename(temporaryName, targetFileName);
+
+  const image = await Jimp.read(targetFileName);
+  image.resize(250, 250).write(targetFileName);
+
+  const avatarURL = path.join("avatars", filename);
+  const updatedUser = await User.findByIdAndUpdate(
+    _id,
+    { avatarURL },
+    { new: true }
+  );
+
+  res.json({
+    avatarURL: updatedUser.avatarURL,
+  });
+};
 
 module.exports = {
   register: ctrlWrapper(register),
@@ -80,4 +117,5 @@ module.exports = {
   logout: ctrlWrapper(logout),
   current: ctrlWrapper(current),
   updateSubscriptionUser: ctrlWrapper(updateSubscriptionUser),
+  updateAvatar: ctrlWrapper(updateAvatar),
 };

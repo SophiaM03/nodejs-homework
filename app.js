@@ -1,10 +1,13 @@
 const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
+const path = require("path");
 
 const contactsRouter = require("./routes/api/contacts");
 const authRouter = require("./routes/api/auth");
 const app = express();
+const publicDir = path.join(process.cwd(), "public");
+app.use(express.static(publicDir));
 
 const formatsLogger = app.get("env") === "development" ? "dev" : "short";
 

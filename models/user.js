@@ -33,6 +33,14 @@ const userSchema = new Schema(
       required: [true, "avatarURL is required"],
     },
     token: String,
+    verify: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+      required: [true, "Verify token is required"],
+    },
   },
   { versionKey: false, timestamps: true }
 );

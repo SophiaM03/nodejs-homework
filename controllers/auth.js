@@ -5,7 +5,6 @@ const gravatar = require("gravatar");
 const path = require("path");
 const fs = require("fs/promises");
 const { nanoid } = require("nanoid");
-const Joi = require("joi");
 
 const { User } = require("../models/user");
 
@@ -69,11 +68,11 @@ const resendVerifyEmail = async (req, res) => {
   const { email } = req.body;
   const user = await User.findOne({ email });
   if (!user) {
-    throw errorHandler(404, "User not found");
+    throw HttpError(404, "User not found");
   }
 
   if (user.verify) {
-    throw errorHandler(401, "Verification has already been passed");
+    throw HttpError(401, "Verification has already been passed");
   }
 
   const varifyEmail = {

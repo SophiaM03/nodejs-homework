@@ -15,9 +15,6 @@ const { sendEmail } = require("../helpers/sendEmail");
 
 const { SECRET_KEY } = process.env;
 const avatarsDir = path.join(__dirname, "public", "avatars");
-const addSchema = Joi.object({
-  email: Joi.string().required(),
-});
 
 const register = async (req, res) => {
   const { email, password } = req.body;
@@ -70,30 +67,25 @@ const verifyEmail = async (req, res) => {
 
 const resendVerifyEmail = async (req, res) => {
   const { email } = req.body;
-  const user = await UserModel.findOne({ email });
-
-  const { error } = addSchema.validate({ email });
-  if (error) {
-    return res.status(400).json(error.message);
-  }
-
+  const user = await User.findOne({ email });
   if (!user) {
-    throw HttpError(401, "User not found");
-  }
-  if (user.verify) {
-    throw HttpError(400, "Verification has already been passed");
+    throw errorHandler(404, "User not found");
   }
 
-  const verifyEmail = {
+  if (user.verify) {
+    throw errorHandler(401, "Verification has already been passed");
+  }
+
+  const varifyEmail = {
     to: email,
     subject: "Verify email",
-    html: `<a target='_blank' href='${BASE_URL}/api/auth/verify/${user.verificationToken}'>Click verify email</a>`,
+    html: `<a target="_blank" href="${BASE_URL}/api/auth/verify/${user.verificationToken}">Click verify email</a>`,
   };
 
-  await sendEmail(verifyEmail);
+  await sendEmail(varifyEmail);
 
-  res.json({
-    message: "Verification has already been passed",
+  res.status(200).json({
+    message: "Verification successful!",
   });
 };
 
